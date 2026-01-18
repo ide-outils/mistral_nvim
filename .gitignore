@@ -1,0 +1,12 @@
+/target
+/code_modifier/target
+/mistral_nvim_derive/target
+/mistral_nvim_derive/src/serde_derive_internal/serde/
+/old_tests
+conversations
+logs
+Session.vim
+nvim_mistral.log
+mistral.so
+mistral_nvim.so
+Cargo.lock

@@ -1,0 +1,23 @@
+[package]
+name = "mistral_nvim_derive"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[features]
+# Useless, just for serde internals
+default = []
+deserialize_in_place = []
+
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+uuid = { version = "1.18", features = ["v4"] }
+
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

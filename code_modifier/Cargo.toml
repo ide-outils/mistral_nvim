@@ -1,0 +1,9 @@
+[package]
+name = "code_modifier"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tree-sitter = "0.26"
+tree-sitter-language = "0.1.6"
+tree-sitter-rust = "0.24"

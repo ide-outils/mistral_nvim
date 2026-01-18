@@ -1,0 +1,35 @@
+[package]
+name = "mistral"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+prod_mode = []
+no_logs = []
+log_trace = []
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+futures = "0.3"
+nvim-oxi = { version = "0.6", features = ["libuv", "neovim-0-11", "test"] }
+reqwest = { version = "0.12", features = ["stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+tree-sitter = "0.26"
+tree-sitter-rust = "0.24"
+uuid = { version = "1.0", features = ["v4"] }
+mistral_nvim_derive = { path = "mistral_nvim_derive/" }
+code_modifier = { path = "code_modifier/" }
+ron = "0.11"
+schemars = "1.1"
+gix = { version = "0.76.0", default-features = false, features = ["index", "worktree-stream"] }
+
+[build-dependencies]
+nvim-oxi = { version = "0.6", features = ["libuv", "neovim-0-11", "test"] }
+
+[dev-dependencies]
+nvim-oxi = { version = "0.6", features = ["libuv", "neovim-0-11", "test"] }
+schemars = { version = "1.1", features = ["preserve_order"] }
