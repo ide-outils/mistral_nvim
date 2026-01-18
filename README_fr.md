@@ -5,6 +5,10 @@ Le Chat conversationnel est basé sur un stockage par fichier permettant de modi
 Ce plugin permet sélectionner une suite d'outils utilisables par Mistral, pour le moment seule la suite `CodeRefactorisation` existe.
 Il est aussi possible de changer de modèle en cours de conversation, ou de modifier les réponses reçues pour corriger d'éventuelles erreurs/imprécisions.
 
+## Démonstration
+Traduction de `DEV_fr.md` et `README_fr.md`.
+![Demo](example_translation.gif)
+
 
 ## **Fonctionnalités**
 

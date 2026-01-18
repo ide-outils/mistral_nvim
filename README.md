@@ -7,6 +7,10 @@ You can also switch models during a conversation or modify received responses to
 
 [French Version](README_fr.md)
 
+## Demo
+Translation of `DEV_fr.md` and `README_fr.md`.
+![Demo translating few files](example_translation.gif)
+
 ## **Features**
 
 - **Fill In the Middle (FIM)**: Smart code completion based on context.
