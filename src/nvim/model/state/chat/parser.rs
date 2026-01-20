@@ -329,18 +329,19 @@ impl<'a> MsgGen<'a> {
     }
 }
 impl<'a> MsgGen<'a> {
-    fn take_tool_calls(&mut self) -> crate::Result<()> {
+    fn take_tool_calls(&mut self, line_nb: &Row, line: &String) -> crate::Result<()> {
         let Some(mut tc_gen) = self.tool_call_generator.take() else {
             return Ok(());
         };
         match tc_gen.state {
             GeneratorState::TagOpened => {
-                return Err(format!("Tag <{TAG_TOOL_CALL}> not closed.").into_error());
+                return Err(format!("Tag <{TAG_TOOL_CALL}> not closed at line {line_nb} : `{line}`").into_error());
             }
             GeneratorState::TagClosed => {
-                let tool_calls = tc_gen.take();
+                let (tool_calls, positions): (Vec<_>, _) = tc_gen.take().into_iter().unzip();
                 if !tool_calls.is_empty() {
                     self.current_message.message.tool_calls = Some(tool_calls);
+                    self.current_message.tool_calls_positions = Some(positions);
                     // Can't have both tool calls and content, so let's clear it up.
                     self.current_message.message.content.clear();
                 }
@@ -363,7 +364,7 @@ impl<'a> Generator for MsgGen<'a> {
             if !is_message_tag {
                 return tc_gen.next_line(line_nb, line);
             }
-            self.take_tool_calls()?;
+            self.take_tool_calls(line_nb, line)?;
         }
         if is_message_tag {
             crate::log_libuv!(Trace, "Found tag {TAG_MESSAGE};");
@@ -394,7 +395,7 @@ impl<'a> Generator for MsgGen<'a> {
     }
     fn finalise(&mut self) -> crate::Result<()> {
         if self.nb_messages > 0 {
-            self.take_tool_calls()?;
+            self.take_tool_calls(&Row::MAX, &"<FINALISE>".to_string())?;
             let mut prev_message = std::mem::take(&mut self.current_message);
             prev_message.message.content = prev_message.message.content.trim_end().to_string();
             self.messages.push(prev_message);
@@ -417,8 +418,8 @@ impl<'a> Generator for MsgGen<'a> {
 pub(super) struct ToolCallGen<'a> {
     state: GeneratorState,
     args: &'a GeneratorArgs,
-    current: mistral::model::ToolCall,
-    tool_calls: Vec<mistral::model::ToolCall>,
+    current: (mistral::model::ToolCall, RowRange),
+    tool_calls: Vec<(mistral::model::ToolCall, RowRange)>,
     in_json_block: bool,
 }
 impl<'a> ToolCallGen<'a> {
@@ -433,20 +434,22 @@ impl<'a> ToolCallGen<'a> {
     }
 }
 impl<'a> Generator for ToolCallGen<'a> {
-    type Item = mistral::model::ToolCall;
+    type Item = (mistral::model::ToolCall, RowRange);
 
     fn state(&mut self) -> &mut GeneratorState {
         &mut self.state
     }
-    fn next_line_state(&mut self, _line_nb: &Row, line: &String) -> crate::Result<GeneratorState> {
+    fn next_line_state(&mut self, line_nb: &Row, line: &String) -> crate::Result<GeneratorState> {
         if is_open_tag_line(&line, TAG_TOOL_CALL) {
             crate::log_libuv!(Trace, "Found tag {TAG_TOOL_CALL};");
             parse_tag_line(&line, |key, val, _cols| {
                 crate::log_libuv!(Trace, "PARSE : {key} ; {val} ");
-                tool_call_setter(key, val, &mut self.current)
+                tool_call_setter(key, val, &mut self.current.0)
             });
+            self.current.1.start = line_nb.clone();
             return Ok(GeneratorState::TagOpened);
         } else if is_close_tag_line(&line, TAG_TOOL_CALL) {
+            self.current.1.end = line_nb.clone();
             self.tool_calls.push(std::mem::take(&mut self.current));
             return Ok(GeneratorState::TagClosed);
         } else if line == "```json" {
@@ -454,7 +457,7 @@ impl<'a> Generator for ToolCallGen<'a> {
         } else if line == "```" {
             self.in_json_block = false
         } else if self.in_json_block {
-            let args = &mut self.current.function.arguments;
+            let args = &mut self.current.0.function.arguments;
             if !args.is_empty() {
                 args.push('\n');
             }

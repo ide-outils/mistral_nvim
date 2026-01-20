@@ -90,7 +90,6 @@ pub fn handle_nvim_message(
         MistralMessage::RunTool(tool_calls) => {
             // crate::log_libuv!(Off, "[index {message_index}] {tool_calls:?}");
             let mut chat = chat.lock();
-            let range_to_update = chat.positions.last().clone();
             let Some(target_message) = chat.messages.last_mut() else {
                 return Err("No more messages in chat : Can't run tool.".into_error());
             };
@@ -110,24 +109,25 @@ pub fn handle_nvim_message(
             }
             let mut messages_tool = Vec::with_capacity(tool_calls.len());
             for tool in tool_calls {
-                let tool_id =
-                    crate::utils::tool_id::tool_id_to_usize(tool.id.as_ref().map(|s| s.as_str()).unwrap_or(""));
-                crate::log_libuv!(Trace, "Tool {tool_id}");
+                // let tool_id =
+                //     crate::utils::tool_id::tool_id_to_usize(tool.id.as_ref().map(|s| s.as_str()).unwrap_or(""));
+                // crate::log_libuv!(Trace, "Tool {tool_id}");
                 let mut mode = mode.clone();
-                let params = params.clone();
-                let model = model.clone();
                 let run_tool_message = crate::messages::RunToolMessage {
                     buffer: buffer.clone(),
                     tool,
                 };
                 let message = mode.run_tool(model::SharedState::clone(state), run_tool_message);
+                let params = params.clone();
+                let model = model.clone();
                 let message_state = chat::MessageState {
                     message,
                     mode,
                     model,
                     usage: Default::default(),
                     params,
-                    status: Default::default(),
+                    status: Status::Completed,
+                    tool_calls_positions: Default::default(),
                 };
                 messages_tool.push(message_state);
             }
@@ -352,7 +352,7 @@ Peux-tu modifier la fonction main dans `tests_files/main.rs` grâce aux outils, 
 ```
 </TOOLCALL>
 
-<MESSAGE role="Tool" model="Tiny Latest" status="Created" usage="0;0;0" mode="CodeRefactorisation" name="CodeRetriever" tool_call_id="F7EJnRYyb"/>
+<MESSAGE role="Tool" model="Tiny Latest" status="Completed" usage="0;0;0" mode="CodeRefactorisation" name="CodeRetriever" tool_call_id="F7EJnRYyb"/>
 {"Ok":"fn main() {\n    println!(\"Salut\\n\");\n}\n"}
 "##;
     chat::assert_content(buffer, BUFFER_CONTENT_1);

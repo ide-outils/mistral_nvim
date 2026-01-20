@@ -64,6 +64,10 @@ pub fn setup_commands(s: &SharedState) -> crate::Result<()> {
     cmd("MistralChatUpdateBuffer", move |_| update_buffer(&state), &opts)?;
     let state = SharedState::clone(&s);
     cmd("MistralChatNewPrompt", move |_| add_prompt(&state).notify(), &opts)?;
+    let state = SharedState::clone(&s);
+    cmd("MistralChatReRunTools", move |_| rerun_tools(&state).notify(), &opts)?;
+    let state = SharedState::clone(&s);
+    cmd("MistralChatReRunTool", move |_| rerun_tool(&state).notify(), &opts)?;
 
     let state = SharedState::clone(&s);
     let opts = api::opts::CreateAutocmdOpts::builder()
@@ -321,6 +325,30 @@ fn add_prompt(state: &SharedState) -> crate::Result<()> {
         chat.mut_message_by_index_isize(-1, |msg| {
             msg.message.role = crate::mistral::model::Role::User;
         })?;
+    }
+    Ok(())
+}
+
+fn rerun_tools(state: &SharedState) -> crate::Result<()> {
+    if let Some(chat) = Chat::from_current_buffer(&state) {
+        let mut chat = chat.lock();
+        if chat.is_running.is_some() {
+            crate::notify::warn("Chat is running.");
+            return Ok(());
+        }
+        chat.rerun_tools_under_cursor(state);
+    }
+    Ok(())
+}
+
+fn rerun_tool(state: &SharedState) -> crate::Result<()> {
+    if let Some(chat) = Chat::from_current_buffer(&state) {
+        let mut chat = chat.lock();
+        if chat.is_running.is_some() {
+            crate::notify::warn("Chat is running.");
+            return Ok(());
+        }
+        chat.rerun_tool_under_cursor(state);
     }
     Ok(())
 }

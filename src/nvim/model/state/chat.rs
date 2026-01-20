@@ -100,14 +100,14 @@ impl MessagesPositions {
             .iter()
             .find(|row_range| row_range.contains(&*current_row))
     }
-    pub fn index_by_row(&self, current_row: Row) -> Option<MsgIndex> {
+    pub fn index_by_row(&self, current_row: &Row) -> Option<MsgIndex> {
         let index = self.pos_index_by_row(current_row)?;
         if index == 0 { None } else { Some(index - 1) }
     }
-    pub fn pos_index_by_row(&self, current_row: Row) -> Option<Position> {
+    pub fn pos_index_by_row(&self, current_row: &Row) -> Option<Position> {
         self.0
             .iter()
-            .position(|row_range| row_range.contains(&*current_row))
+            .position(|row_range| row_range.contains(current_row))
     }
     pub fn get_range_index_by_row(&self, current_row: Row) -> (&RowRange, Position) {
         self.0
@@ -182,6 +182,7 @@ pub struct MessageState {
     pub usage: mistral::model::stream::Usage,
     pub params: mistral::model::completion::CompletionParams,
     pub status: mistral::model::stream::Status,
+    pub tool_calls_positions: Option<Vec<RowRange>>,
 }
 
 /// This form serves to setup a Chat
@@ -505,11 +506,11 @@ impl ChatState {
     }
     pub fn get_position_index(&self, window: &api::Window) -> Option<Position> {
         let (row, _) = self.get_cursor(window)?;
-        self.positions.pos_index_by_row(row)
+        self.positions.pos_index_by_row(&row)
     }
     pub fn get_position_index_cursor(&self, window: &api::Window) -> Option<(Position, Cursor)> {
         let (row, col) = self.get_cursor(window)?;
-        Some((self.positions.pos_index_by_row(row)?, Cursor { row, col }))
+        Some((self.positions.pos_index_by_row(&row)?, Cursor { row, col }))
     }
     /// Get the current message.
     ///
@@ -685,6 +686,72 @@ impl ChatState {
     //     }
     //     self.mut_message_by_index(-1, modifier)
     // }
+
+    fn rerun_tools(&mut self, state: &super::SharedState, message_index: MsgIndex, target: Option<Row>) {
+        let Some(message) = self.messages.get_mut(message_index) else {
+            crate::log_libuv!(Error, "Run tool : MessageIndex does not exist.");
+            return;
+        };
+        let (Some(tools), Some(positions)) = (
+            message.message.tool_calls.as_ref(),
+            message.tool_calls_positions.clone(),
+        ) else {
+            crate::notify::info("No tool_calls to run.");
+            return;
+        };
+        let mut mode = message.mode.clone();
+        let tools = tools.clone();
+        let following_messages = &mut self.messages[message_index..];
+        'next_tool_call: for (tool, position) in tools.into_iter().zip(positions) {
+            if let Some(target_row) = target
+                && !position.contains(&target_row)
+            {
+                continue;
+            }
+            let Some(id) = tool.id.clone() else {
+                crate::notify::warn("Can't run tool without an id.");
+                continue;
+            };
+            let run_tool_message = crate::messages::RunToolMessage {
+                buffer: self.buffer.clone(),
+                tool,
+            };
+            let response = mode.run_tool(model::SharedState::clone(state), run_tool_message);
+            for msg_response in following_messages.iter_mut() {
+                if let Some(resp_id) = msg_response.message.tool_call_id.as_ref()
+                    && *resp_id == id
+                {
+                    msg_response.message.content = response.content;
+                    if target.is_some() {
+                        break 'next_tool_call;
+                    } else {
+                        continue 'next_tool_call;
+                    }
+                }
+            }
+            crate::notify::warn("Tool Call's Message Response not found.");
+        }
+    }
+    pub fn rerun_tools_under_cursor(&mut self, state: &super::SharedState) {
+        let Some(Cursor { row, .. }) = Cursor::from_window_current() else {
+            return;
+        };
+        let Some(msg_index) = self.positions.index_by_row(&row) else {
+            crate::notify::info("Cursor not under a Message.");
+            return;
+        };
+        self.rerun_tools(state, msg_index, None);
+    }
+    pub fn rerun_tool_under_cursor(&mut self, state: &super::SharedState) {
+        let Some(Cursor { row, .. }) = Cursor::from_window_current() else {
+            return;
+        };
+        let Some(msg_index) = self.positions.index_by_row(&row) else {
+            crate::notify::info("Cursor not under a Message.");
+            return;
+        };
+        self.rerun_tools(state, msg_index, Some(row));
+    }
 }
 
 #[cfg(not(feature = "prod_mode"))]
