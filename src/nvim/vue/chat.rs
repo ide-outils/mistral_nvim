@@ -108,6 +108,7 @@ pub fn handle_nvim_message(
             for tool in &tool_calls {
                 chat.push_tool_call(&tool, Some(assistant_index))?;
             }
+            let mut messages_tool = Vec::with_capacity(tool_calls.len());
             for tool in tool_calls {
                 let tool_id =
                     crate::utils::tool_id::tool_id_to_usize(tool.id.as_ref().map(|s| s.as_str()).unwrap_or(""));
@@ -128,9 +129,11 @@ pub fn handle_nvim_message(
                     params,
                     status: Default::default(),
                 };
+                messages_tool.push(message_state);
+            }
+            for message_state in messages_tool {
                 chat.push_message(message_state, Some(assistant_index))?;
             }
-            chat.update_buffer(range_to_update)?;
             let mut envelop = chat.build_request_envelop()?;
             let next_id = chat.messages.len() - 1;
             envelop.id = crate::messages::IdMessage::Chat(buffer.handle(), next_id);
