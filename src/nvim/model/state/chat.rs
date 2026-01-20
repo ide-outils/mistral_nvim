@@ -427,6 +427,35 @@ impl ChatState {
             Ok(())
         }
     }
+    fn update_message_content(&mut self, message_index: MsgIndex) -> crate::Result<()> {
+        let Some(message) = self.messages.get_mut(message_index) else {
+            return Err(format!("Can't find message by index ({message_index}).").into_error());
+        };
+        let Some(pos) = self.positions.get_by_msg_index(message_index) else {
+            // TODO: could unreachable, messages and positions must be sync.
+            return Err("Can't get position, but message exists for the same index.".into_error());
+        };
+        let buf = &mut self.buffer;
+        let mut pos = pos.clone();
+        pos.start += 1; // Start is Tag line, and we just modify the content
+        let prev_len = *pos.end - *pos.start;
+        let new_len = message.message.content.len() + 1;
+        crate::log_libuv!(
+            Trace,
+            "Updated message content ({message_index}) : `{:?}`",
+            message.message.content
+        );
+        let lines = message
+            .message
+            .content
+            .split("\n")
+            .chain(std::iter::once(""));
+        model::cursor::set_lines(buf, pos.clone(), false, lines)?;
+        if prev_len != new_len {
+            self.update_buffer(RowRange::FULL)?;
+        }
+        Ok(())
+    }
     fn update_config_tag_line(&mut self) -> crate::Result<()> {
         let buf = &mut self.buffer.clone();
         let row = Row(0);
@@ -702,6 +731,7 @@ impl ChatState {
         let mut mode = message.mode.clone();
         let tools = tools.clone();
         let following_messages = &mut self.messages[message_index..];
+        let mut updated_content = Vec::with_capacity(tools.len());
         'next_tool_call: for (tool, position) in tools.into_iter().zip(positions) {
             if let Some(target_row) = target
                 && !position.contains(&target_row)
@@ -717,11 +747,13 @@ impl ChatState {
                 tool,
             };
             let response = mode.run_tool(model::SharedState::clone(state), run_tool_message);
-            for msg_response in following_messages.iter_mut() {
+            for (i, msg_response) in following_messages.iter_mut().enumerate() {
                 if let Some(resp_id) = msg_response.message.tool_call_id.as_ref()
                     && *resp_id == id
                 {
+                    updated_content.push(message_index + i);
                     msg_response.message.content = response.content;
+                    crate::notify::info(format!("Tool Call {id} has rerunned correctly."));
                     if target.is_some() {
                         break 'next_tool_call;
                     } else {
@@ -730,6 +762,9 @@ impl ChatState {
                 }
             }
             crate::notify::warn("Tool Call's Message Response not found.");
+        }
+        for msg_index in updated_content {
+            self.update_message_content(msg_index).notify_error();
         }
     }
     pub fn rerun_tools_under_cursor(&mut self, state: &super::SharedState) {

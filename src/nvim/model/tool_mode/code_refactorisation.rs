@@ -214,7 +214,9 @@ impl Runnable for CodeModifier {
                 Some(Some("rs")) => Rust::new_parser(code.as_slice()),
                 _ => {
                     file.write_all(code_injection)?;
-                    return Ok("File replaced : file's extension not supported for granular updates.".to_string());
+                    return Ok(
+                        "File fully replaced : file's extension not supported for granular updates.".to_string(),
+                    );
                 }
             };
             let Some(mut parser) = parser else {
