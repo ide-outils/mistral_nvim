@@ -362,7 +362,9 @@ impl ChatState {
     }
     pub fn push_message(&mut self, message: MessageState, id: Option<usize>) -> crate::Result<()> {
         let lines = build_tag_message_lines(message);
-        self.insert(lines, id)
+        self.insert(lines, id)?;
+        bar::StatusLineChatCache::outdate_all_pages(&self.buffer, self.messages.len());
+        Ok(())
     }
     pub fn push_new_message(&mut self, id: Option<usize>) -> crate::Result<()> {
         let Some(last) = self.messages.last() else {
@@ -372,10 +374,6 @@ impl ChatState {
         next_msg.mode = last.mode.clone();
         next_msg.model = last.model.clone();
         next_msg.params = last.params.clone();
-        // No line before, it would messed up the order push_buffer_line(buffer, format!(""));
-        // let added_rows_cols = self.push_message(next_msg)?;
-        // self.update_buffer(last_range)?;
-        // Ok(added_rows_cols)
         self.push_message(next_msg, id)
     }
     pub fn push_tool_call(&mut self, tool_call: &mistral::model::ToolCall, id: Option<usize>) -> crate::Result<()> {
@@ -422,6 +420,7 @@ impl ChatState {
             }
             self.replace_line(row, line, Some(message_index))
                 .unwrap();
+            bar::StatusLineChatCache::outdate_page(&self.buffer, message_index + 1);
             Ok(())
         } else {
             Ok(())
@@ -612,9 +611,14 @@ impl ChatState {
     where
         Callback: FnOnce(&mut ChatState),
     {
+        let prev_len = self.messages.len();
         modifier(self);
         self.update_config_tag_line()?;
-        bar::StatusLineChatCache::outdate_all_pages(&self.buffer, self.messages.len());
+        let new_len = self.messages.len();
+        if new_len != prev_len {
+            bar::StatusLineChatCache::outdate_all_pages(&self.buffer, new_len);
+        }
+        bar::StatusLineChatCache::outdate_page(&self.buffer, 0);
         Ok(())
     }
 
@@ -637,7 +641,6 @@ impl ChatState {
             modifier(&mut message);
         }
         self.update_message_tag_line(msg_index)?;
-        bar::StatusLineChatCache::outdate_page(&self.buffer, msg_index + 1);
         Ok(())
     }
 

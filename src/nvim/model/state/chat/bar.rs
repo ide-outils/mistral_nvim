@@ -160,8 +160,17 @@ impl StatusLine {
     }
     fn update_full(&mut self, chat: std::sync::MutexGuard<'_, super::ChatState>, page: &Page) {
         let len_messages = chat.messages.len();
+        match page {
+            Page::Message(msg_index) | Page::Prompt(msg_index) => self.update_message(chat, *msg_index),
+            Page::Header => self.update_header(chat),
+        }
+        self.update_page(page, len_messages);
+    }
+    fn update_message(&mut self, chat: std::sync::MutexGuard<'_, super::ChatState>, msg_index: usize) {
+        let Some(msg) = &chat.messages.get(msg_index) else {
+            return;
+        };
         let md = &chat.metadata;
-        let Some(msg) = &chat.messages.get(0) else { return };
         let usage: (&Usage, &Role, &Option<u32>) = (&msg.usage, &msg.message.role, &msg.params.max_tokens);
         self.computed_without_page = self
             .pre_computed
@@ -170,10 +179,18 @@ impl StatusLine {
             .replace("%{MODE}", &msg.mode.to_string())
             .replace("%{STATUS}", &parse_status(&msg.status))
             .replace("%{ROLE}", &parse_role(&usage.1))
-            .replace("%{USAGE}", &parse_usage(usage))
-            .replace("%{H_USAGE_PROMPT}", &usage.0.prompt_tokens.to_string())
-            .replace("%{H_USAGE_COMPLETION}", &usage.0.completion_tokens.to_string());
-        self.update_page(page, len_messages);
+            .replace("%{USAGE}", &parse_usage(usage));
+    }
+    fn update_header(&mut self, chat: std::sync::MutexGuard<'_, super::ChatState>) {
+        let len_messages = chat.messages.len();
+        let md = &chat.metadata;
+        let usage = &md.usage;
+        self.computed_without_page = self
+            .pre_computed
+            .replace("%{NAME}", &escape(&md.name))
+            .replace("%{H_USAGE_PROMPT}", &usage.prompt_tokens.to_string())
+            .replace("%{H_USAGE_COMPLETION}", &usage.completion_tokens.to_string());
+        self.update_page(&Page::Header, len_messages);
     }
     fn update_page(&mut self, page: &Page, len_messages: usize) {
         let page_status = PageStatus::new(page, len_messages);
@@ -314,7 +331,7 @@ impl StatusLineChatCache {
         if let Some(cache) = CACHE.lock().unwrap().get_mut(buffer) {
             cache.fill_missing_statuslines(position);
             if let Some(statusline) = cache.statuslines.get_mut(position) {
-                statusline.outdated = Some(Outdate::Page);
+                statusline.outdated = Some(Outdate::Full);
             }
         }
         Self::update_current_window(buffer);
@@ -333,13 +350,11 @@ impl StatusLineChatCache {
 
 impl super::Chat {
     pub fn configure_statusline(self, buffer: &api::Buffer, window: api::Window) {
-        {
-            let mut global_cache = CACHE.lock().unwrap();
-            if let Some(cache) = global_cache.get_mut(buffer) {
-                cache.update_window(&window);
-                return;
-            }
-            global_cache.insert(buffer.clone(), StatusLineChatCache::new(self, window));
+        let mut global_cache = CACHE.lock().unwrap();
+        if let Some(cache) = global_cache.get_mut(buffer) {
+            cache.update_window(&window);
+            return;
         }
+        global_cache.insert(buffer.clone(), StatusLineChatCache::new(self, window));
     }
 }
