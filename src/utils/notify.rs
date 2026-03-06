@@ -44,6 +44,7 @@ pub enum NotifyLevel {
     Off = 5,
 }
 impl Into<LogLevel> for NotifyLevel {
+    #[track_caller]
     fn into(self) -> LogLevel {
         use NotifyLevel::*;
         match self {
@@ -57,56 +58,65 @@ impl Into<LogLevel> for NotifyLevel {
     }
 }
 
+#[track_caller]
 #[cfg(feature = "prod_mode")]
 pub fn trace(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Trace, "{msg}");
 }
+#[track_caller]
 #[cfg(not(feature = "prod_mode"))]
 pub fn trace(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Trace, "{msg}");
     notify(&msg, LogLevel::Trace, &Dictionary::new()).expect("Can not notify.");
 }
+#[track_caller]
 #[cfg(feature = "prod_mode")]
 pub fn debug(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Debug, "{msg}");
 }
+#[track_caller]
 #[cfg(not(feature = "prod_mode"))]
 pub fn debug(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Debug, "{msg}");
     notify(&msg, LogLevel::Debug, &Dictionary::new()).expect("Can not notify.");
 }
+#[track_caller]
 pub fn info(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Info, "{msg}");
     notify(&msg, LogLevel::Info, &Dictionary::new()).expect("Can not notify.");
 }
+#[track_caller]
 #[cfg(test)]
 pub fn warn(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Warn, "{msg}");
 }
+#[track_caller]
 #[cfg(not(test))]
 pub fn warn(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Warn, "{msg}");
     notify(&msg, LogLevel::Warn, &Dictionary::new()).expect("Can not notify.");
 }
+#[track_caller]
 #[cfg(test)]
 pub fn error(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Error, "{msg}");
 }
-#[cfg(not(test))]
 #[track_caller]
+#[cfg(not(test))]
 pub fn error(message: impl ToString) {
     let msg = format!("[{}] : {}", std::panic::Location::caller(), message.to_string());
     crate::log_libuv!(Error, "{msg}");
     notify(&msg, LogLevel::Error, &Dictionary::new()).expect("Can not notify.");
 }
+#[track_caller]
 pub fn off(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Off, "{msg}");

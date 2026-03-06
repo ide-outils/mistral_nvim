@@ -31,6 +31,7 @@ pub static THRESHOLD: LazyLock<RwLock<Level>> = LazyLock::new(|| Level::Off.into
 
 #[cfg(not(feature = "no_logs"))]
 impl Level {
+    #[track_caller]
     pub fn set_by_args(&mut self, args: nvim_oxi::api::types::CommandArgs) {
         let Some(arg) = args.fargs.get(0) else { return };
         use notify::NotifyLevel::*;
@@ -70,6 +71,7 @@ pub struct Log {
 }
 
 impl Log {
+    #[track_caller]
     pub fn new(level: Level, message: String) -> Self {
         Self { level, message }
     }
@@ -121,13 +123,16 @@ macro_rules! log_tokio {
         }
     }};
 }
+#[track_caller]
 pub fn send_logs_libuv(log: Log) {
     send_log(&LOG_SENDERS.0, log, "libuv", 10);
 }
+#[track_caller]
 pub fn send_logs_tokio(log: Log) {
     send_log(&LOG_SENDERS.1, log, "tokio", 5);
 }
 #[inline]
+#[track_caller]
 fn send_log(sender: &Sender<Log>, log: Log, queue_name: &'static str, max_attemps: usize) {
     let mut prev_try = log;
     let mut attemps = 0;
@@ -155,6 +160,7 @@ fn send_log(sender: &Sender<Log>, log: Log, queue_name: &'static str, max_attemp
 }
 
 #[cfg(not(feature = "prod_mode"))]
+#[track_caller]
 fn start_logger_task(_libuv_rx: Receiver<Log>, _tokio_rx: Receiver<Log>) {}
 
 #[cfg(feature = "prod_mode")]
@@ -186,6 +192,7 @@ fn start_logger_task(mut libuv_rx: Receiver<Log>, mut tokio_rx: Receiver<Log>) {
     });
 }
 
+#[track_caller]
 pub fn format_log(logger: &str, log: Log) -> Option<String> {
     if log.level >= *THRESHOLD.read().unwrap() {
         let timestamp = SystemTime::now()

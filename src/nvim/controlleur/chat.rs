@@ -1,12 +1,15 @@
 use std::sync::{Arc, LazyLock, Mutex};
 
-use nvim_oxi::api::{self, opts::CreateCommandOpts};
+use nvim_oxi::api::{self, opts::CreateCommandOpts, types::CommandRange};
 
 use super::form;
 use crate::{
     notify::{NotifyExt as _, NotifyExtV2},
     nvim::model::{self, Chat, ChatForm, Locker as _, RowRange, SharedState, state::chat::bar},
 };
+
+mod code_block_paste;
+use code_block_paste::code_block_paste;
 
 const CHAT_FILES: [&'static str; 1] = ["*.chat"];
 static GROUP: LazyLock<u32> = LazyLock::new(|| api::create_augroup("MistralChat", &Default::default()).unwrap_or(0));
@@ -69,6 +72,11 @@ pub fn setup_commands(s: &SharedState) -> crate::Result<()> {
     let state = SharedState::clone(&s);
     cmd("MistralChatReRunTool", move |_| rerun_tool(&state).notify(), &opts)?;
 
+    let vopt = CreateCommandOpts::builder()
+        .range(CommandRange::WholeFile)
+        .build();
+    cmd("MistralCodeBlockPaste", |args| code_block_paste(args).notify(), &vopt)?;
+
     let state = SharedState::clone(&s);
     let opts = api::opts::CreateAutocmdOpts::builder()
         .group(*GROUP)
@@ -84,17 +92,19 @@ pub fn setup_commands(s: &SharedState) -> crate::Result<()> {
 
     let modified_rows: ModifiedRows = Default::default();
     let modified_rows_cloned = Arc::clone(&modified_rows);
+    let modified_rows = Arc::clone(&modified_rows_cloned);
     let opts = api::opts::CreateAutocmdOpts::builder()
         .group(*GROUP)
         .desc("Notify the changements in the buffer.")
         .patterns(CHAT_FILES)
         .callback(move |args: api::types::AutocmdCallbackArgs| -> bool {
-            text_changed(&modified_rows_cloned, &args.buffer);
+            text_changed(&modified_rows, &args.buffer);
             false
         })
         .build();
     api::create_autocmd(["TextChanged", "TextChangedI", "TextChangedP", "TextChangedT"], &opts).unwrap();
 
+    let modified_rows = Arc::clone(&modified_rows_cloned);
     let state = SharedState::clone(&s);
     let opts = api::opts::CreateAutocmdOpts::builder()
         .group(*GROUP)
@@ -111,8 +121,10 @@ pub fn setup_commands(s: &SharedState) -> crate::Result<()> {
         .group(*GROUP)
         .desc("Update Chat's status line.")
         .patterns(CHAT_FILES)
-        .callback(|mut args: api::types::AutocmdCallbackArgs| -> bool {
+        .callback(move |mut args: api::types::AutocmdCallbackArgs| -> bool {
             bar::StatusLineChatCache::update_current_window(&mut args.buffer);
+            // Would lock when cursor move, so do not :
+            // update_buffer_with_modified_rows(&state, &modified_rows, &args.buffer);
             false
         })
         .build();
@@ -141,6 +153,7 @@ fn update_buffer_with_modified_rows(state: &SharedState, modified_rows: &Modifie
             return;
         }
     };
+    // FIXME : Create issues with modes so deactivated for now
     if !ranges.is_empty() {
         if let Some(chat) = Chat::from_buffer(&state, buffer) {
             let mut chat = chat.lock();
@@ -166,7 +179,7 @@ fn update_buffer_with_modified_rows(state: &SharedState, modified_rows: &Modifie
             let range = (range_start.start..=range_end.end).into();
             chat.update_buffer(range).notify_error();
             drop(chat);
-            bar::StatusLineChatCache::update_current_window(&mut buffer.clone());
+            bar::StatusLineChatCache::update_current_window(buffer);
         }
     }
 }

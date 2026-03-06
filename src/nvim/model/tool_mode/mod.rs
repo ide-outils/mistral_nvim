@@ -1,11 +1,14 @@
-pub mod code_refactorisation;
-
-use code_refactorisation::CodeRefactorisation;
 use mistral_nvim_derive::{Form, Tool};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{mistral, mistral::model::tools::*, nvim::model::SharedState};
+
+pub mod cargo_check;
+pub mod code_refactorisation;
+
+use cargo_check::Cargo;
+use code_refactorisation::CodeRefactorisation;
 
 /// Change the mode to activate dedicated tools.
 #[derive(Tool, Form, JsonSchema, Serialize, Deserialize, Default, Clone, Debug)]
@@ -17,6 +20,8 @@ pub enum Mode {
     r#None,
     /// Tools to refactor the code (move function, etc).
     CodeRefactorisation,
+    /// Tools to run cargo commands.
+    Cargo,
 }
 impl Mode {
     pub fn replace_from_str(&mut self, value: &str) {
@@ -52,6 +57,7 @@ impl std::fmt::Display for Mode {
         let name = match self {
             Mode::None => "None",
             Mode::CodeRefactorisation => "CodeRefactorisation",
+            Mode::Cargo => "Cargo",
         };
         write!(f, "{name}")
     }
@@ -62,6 +68,7 @@ impl Mode {
         match self {
             Self::None => self.set_mode(state, msg),
             Self::CodeRefactorisation => CodeRefactorisation::run(state, msg),
+            Self::Cargo => Cargo::run(state, msg),
         }
     }
     pub fn set_mode(&mut self, _state: SharedState, msg: crate::messages::RunToolMessage) -> mistral::model::Message {
@@ -77,7 +84,7 @@ impl Mode {
         match self {
             Self::None => vec![Self::get_tool()],
             Self::CodeRefactorisation => CodeRefactorisation::get_tools(),
-            // ...
+            Self::Cargo => Cargo::get_tools(),
         }
     }
 }

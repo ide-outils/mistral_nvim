@@ -10,6 +10,7 @@ use crate::{
 pub mod chat;
 mod fim;
 mod form;
+mod latex;
 
 // pub fn setup(sender: mpsc::UnboundedSender<NvimEnveloppe>, state: SharedState) -> crate::Result<()> {
 pub fn setup(s: &SharedState) -> crate::Result<()> {

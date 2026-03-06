@@ -221,7 +221,7 @@ impl Runnable for CodeModifier {
             };
             let Some(mut parser) = parser else {
                 // If failed write back previous content.
-                file.write_all(code.as_slice())?;
+                file.write_all(code_injection)?;
                 return Err("Can't parser code with tree-sitter.".into_error());
             };
             let Some(modifications) = parser.inject(code_injection) else {

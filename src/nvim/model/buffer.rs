@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use nvim_oxi::api::{self, opts::OptionOpts};
+use nvim_oxi::api::{self, opts::OptionOpts, types::CommandArgs};
 
-use crate::nvim::model::{Cursor, NvimBound, OneIndexed};
+use crate::nvim::model::{Col, Cursor, NvimBound, OneIndexed, Row};
 
 #[derive(Debug)]
 pub struct Selection {
