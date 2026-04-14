@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr as _};
 
 use mistral_nvim_derive::Form;
 use nvim_oxi::api;
@@ -51,7 +51,7 @@ impl Chat {
         Chat(std::sync::Arc::new(std::sync::Mutex::new(value)))
     }
     pub fn from_buffer(state: &super::SharedState, buffer: &api::Buffer) -> Option<Self> {
-        let path = buffer.get_name().ok()?;
+        let path = crate::utils::buffer::get_path(&buffer)?;
         Some(Self::clone(state.lock().chats.get_by_path(&path)?))
     }
     pub fn from_current_buffer(state: &super::SharedState) -> Option<Self> {
@@ -210,9 +210,7 @@ impl ChatState {
         let desc = description.clone();
         let mut chat_state = Self {
             is_running: None,
-            path: buffer
-                .get_name()
-                .expect("Buffer should already have a path."),
+            path: crate::utils::buffer::get_path(buffer).expect("Buffer should already have a path."),
             buffer: buffer.clone(),
             buffer_modifier: None,
             metadata: ChatMetadata {
@@ -247,9 +245,7 @@ impl ChatState {
         let messages = vec![];
         let mut chat_state = Self {
             is_running: None,
-            path: buffer
-                .get_name()
-                .expect("Buffer should already have a path."),
+            path: crate::utils::buffer::get_path(buffer).expect("Buffer should already have a path."),
             buffer: buffer.clone(),
             buffer_modifier: None,
             metadata: Default::default(),

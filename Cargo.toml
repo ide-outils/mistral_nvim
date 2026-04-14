@@ -13,7 +13,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 futures = "0.3"
-nvim-oxi = { version = "0.6", features = ["libuv", "neovim-0-11", "test"] }
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi.git", rev = "d411003cbe660cd32014806b2d1a04651b7d06e0", features = ["libuv", "neovim-0-12", "test"] }
 reqwest = { version = "0.12", features = ["stream"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -28,8 +28,8 @@ schemars = "1.1"
 gix = { version = "0.76.0", default-features = false, features = ["index", "worktree-stream"] }
 
 [build-dependencies]
-nvim-oxi = { version = "0.6", features = ["libuv", "neovim-0-11", "test"] }
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi.git", rev = "d411003cbe660cd32014806b2d1a04651b7d06e0", features = ["libuv", "neovim-0-12", "test"] }
 
 [dev-dependencies]
-nvim-oxi = { version = "0.6", features = ["libuv", "neovim-0-11", "test"] }
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi.git", rev = "d411003cbe660cd32014806b2d1a04651b7d06e0", features = ["libuv", "neovim-0-12", "test"] }
 schemars = { version = "1.1", features = ["preserve_order"] }

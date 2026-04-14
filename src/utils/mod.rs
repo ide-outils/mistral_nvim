@@ -2,6 +2,7 @@ use nvim_oxi::api::{self, types};
 
 use crate::notify::NotifyExt as _;
 
+pub mod buffer;
 pub mod logger;
 pub mod notify;
 pub mod tool_id;
@@ -11,7 +12,7 @@ where
     Opt: nvim_oxi::conversion::ToObject,
 {
     let buffer = buffer.clone();
-    let opt_buffer = api::opts::OptionOpts::builder().buffer(buffer).build();
+    let opt_buffer = api::opts::OptionOpts::builder().buf(buffer).build();
     api::set_option_value(var, value, &opt_buffer).notify_error();
 }
 
@@ -29,7 +30,7 @@ where
     Opt: nvim_oxi::conversion::FromObject,
 {
     let buffer = buffer.clone();
-    let opt_buffer = api::opts::OptionOpts::builder().buffer(buffer).build();
+    let opt_buffer = api::opts::OptionOpts::builder().buf(buffer).build();
     api::get_option_value::<Opt>(var, &opt_buffer)
 }
 

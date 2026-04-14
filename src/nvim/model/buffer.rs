@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr as _};
 
 use nvim_oxi::api::{self, opts::OptionOpts, types::CommandArgs};
 
@@ -28,7 +28,7 @@ pub struct BufferData {
 impl Selection {
     /// Get the mark if the mode is visual.
     pub fn from_mark_visual(buffer: &api::Buffer) -> crate::Result<Self> {
-        let mode = api::get_mode()?;
+        let mode = api::get_mode();
         if !mode.mode.is_visual() {
             Err("Not in visual Mode.".into())
         } else {
@@ -116,14 +116,14 @@ impl BufferData {
             crate::notify::error(msg);
             return Err(msg.into());
         };
-        let opt_buffer = OptionOpts::builder().buffer(buffer.clone()).build();
+        let opt_buffer = OptionOpts::builder().buf(buffer.clone()).build();
         let content = buffer
             .get_lines(0.., false)?
             .map(|v| v.to_string())
             .collect();
         Ok((
             Self {
-                filepath: buffer.get_name().ok(),
+                filepath: crate::utils::buffer::get_path(&buffer),
                 filetype: api::get_option_value("filetype", &opt_buffer).unwrap_or_default(),
                 cursor,
                 modified: api::get_option_value("modified", &opt_buffer).unwrap_or_default(),

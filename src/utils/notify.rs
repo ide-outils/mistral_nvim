@@ -1,8 +1,26 @@
 use nvim_oxi::{
     Dictionary,
-    api::{notify, types::LogLevel},
+    api::{self, echo, opts::EchoOptsBuilder, types::LogLevel},
 };
 use serde::Serialize;
+
+fn notify(msg: String, level: LogLevel, _deprecated_opts: &Dictionary) {
+    // notify(&msg, LogLevel::Trace, &Dictionary::new());
+    let hl = match level {
+        LogLevel::Trace => None,
+        LogLevel::Debug => None,
+        LogLevel::Info => None,
+        LogLevel::Warn => Some("WarningMsg"),
+        LogLevel::Error => Some("ErrorMsg"),
+        LogLevel::Off => Some("ErrorMsg"),
+        _ => unreachable!(),
+    };
+    // Let's add errors to history
+    let is_error = if let Some("ErrorMsg") = hl { true } else { false };
+    let history = is_error;
+    let opts = EchoOptsBuilder::default().err(is_error).build();
+    let _ = echo(std::iter::once((msg, hl)), history, &opts).expect("Can not notify.");
+}
 
 pub trait NotifyExt {
     fn notify_error(&self);
@@ -69,7 +87,7 @@ pub fn trace(message: impl ToString) {
 pub fn trace(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Trace, "{msg}");
-    notify(&msg, LogLevel::Trace, &Dictionary::new()).expect("Can not notify.");
+    notify(msg, LogLevel::Trace, &Dictionary::new());
 }
 #[track_caller]
 #[cfg(feature = "prod_mode")]
@@ -82,13 +100,13 @@ pub fn debug(message: impl ToString) {
 pub fn debug(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Debug, "{msg}");
-    notify(&msg, LogLevel::Debug, &Dictionary::new()).expect("Can not notify.");
+    notify(msg, LogLevel::Debug, &Dictionary::new());
 }
 #[track_caller]
 pub fn info(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Info, "{msg}");
-    notify(&msg, LogLevel::Info, &Dictionary::new()).expect("Can not notify.");
+    notify(msg, LogLevel::Info, &Dictionary::new());
 }
 #[track_caller]
 #[cfg(test)]
@@ -101,7 +119,7 @@ pub fn warn(message: impl ToString) {
 pub fn warn(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Warn, "{msg}");
-    notify(&msg, LogLevel::Warn, &Dictionary::new()).expect("Can not notify.");
+    notify(msg, LogLevel::Warn, &Dictionary::new());
 }
 #[track_caller]
 #[cfg(test)]
@@ -114,13 +132,13 @@ pub fn error(message: impl ToString) {
 pub fn error(message: impl ToString) {
     let msg = format!("[{}] : {}", std::panic::Location::caller(), message.to_string());
     crate::log_libuv!(Error, "{msg}");
-    notify(&msg, LogLevel::Error, &Dictionary::new()).expect("Can not notify.");
+    notify(msg, LogLevel::Error, &Dictionary::new());
 }
 #[track_caller]
 pub fn off(message: impl ToString) {
     let msg = message.to_string();
     crate::log_libuv!(Off, "{msg}");
-    notify(&msg, LogLevel::Off, &Dictionary::new()).expect("Can not notify.");
+    notify(msg, LogLevel::Off, &Dictionary::new());
 }
 
 #[derive(Debug, Serialize)]
@@ -141,7 +159,7 @@ impl Notification {
         }
     }
     // pub fn notify(self) {
-    //     notify(&self.message, self.level.into(), &Dictionary::new()).expect("Can not notify.");
+    //     notify(&self.message, self.level.into(), &Dictionary::new());
     // }
 }
 
