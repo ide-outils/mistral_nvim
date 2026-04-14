@@ -3,6 +3,7 @@ use super::*;
 pub(super) const TAG_CHAT: &'static str = "CHAT";
 const TAG_MESSAGE: &'static str = "MESSAGE";
 const TAG_TOOL_CALL: &'static str = "TOOLCALL";
+const TAG_FILE: &'static str = "FILE";
 
 pub(super) fn is_self_tag_line(line: &String, tag: &'static str) -> bool {
     line.starts_with(&format!("<{tag}")) && line.ends_with("/>")
@@ -379,6 +380,33 @@ impl<'a> Generator for MsgGen<'a> {
                 message_setter(key, val, &mut self.current_message)
             });
             Ok(GeneratorState::TagClosed)
+        } else if is_self_tag_line(&line, TAG_FILE) {
+            let mut path = String::new();
+            parse_tag_line(&line, |key, val, _cols| {
+                crate::log_libuv!(Trace, "PARSE : {key} ; {val} ");
+                if key == "path" {
+                    path = val;
+                }
+            });
+            if path != "" {
+                let mut content = String::new();
+                use std::io::Read as _;
+                let error = format!("(`{path}`)");
+                if let Ok(mut file) = std::fs::OpenOptions::new().read(true).open(path)
+                    && let Ok(_) = file.read_to_string(&mut content)
+                {
+                    if content.len() > 21000 {
+                        crate::notify::error(format!("Taille de fichier trop grand > 21ko. {error}"));
+                    } else {
+                        self.current_message.message.content += content.as_str();
+                    }
+                } else {
+                    crate::notify::error(format!("Can't read file. {error}"));
+                }
+            } else {
+                crate::notify::error("No path found in <FILE />.");
+            }
+            Ok(*self.state())
         } else if is_open_tag_line(&line, TAG_TOOL_CALL) {
             crate::log_libuv!(Trace, "TOOL_CALL Line found.");
             let mut tc_gen = ToolCallGen::new(self.args);
